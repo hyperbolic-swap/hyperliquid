@@ -1,5 +1,6 @@
 import { encode } from '@msgpack/msgpack';
-import { ethers, getBytes, HDNodeWallet, keccak256, type Wallet } from 'ethers';
+
+import { keccak256, stringToBytes, Signature as ViemSignature } from 'viem';
 
 import type { Builder, Order, OrderRequest, OrderType, OrderWire, Signature, CancelOrderRequest, Grouping } from '../types';
 
@@ -33,7 +34,7 @@ export function orderTypeToWire(orderType: OrderType): OrderType {
 }
 
 function addressToBytes(address: string): Uint8Array {
-    return getBytes(address);
+    return stringToBytes(address);
 }
 
 function actionHash(action: unknown, vaultAddress: string | null, nonce: number): string {
@@ -57,7 +58,6 @@ function constructPhantomAgent(hash: string, isMainnet: boolean) {
 }
 
 export async function signL1Action(
-    wallet: Wallet | HDNodeWallet,
     action: unknown,
     activePool: string | null,
     nonce: number,
@@ -71,11 +71,10 @@ export async function signL1Action(
         primaryType: 'Agent',
         message: phantomAgent,
     };
-    return signInner(wallet, data);
+    return signInner(data);
 }
 
 export async function signUserSignedAction(
-    wallet: Wallet,
     action: any,
     payloadTypes: Array<{ name: string; type: string }>,
     primaryType: string,
@@ -96,12 +95,11 @@ export async function signUserSignedAction(
         primaryType: primaryType,
         message: action,
     };
-    return signInner(wallet, data);
+    return signInner(data);
 }
 
-export async function signUsdTransferAction(wallet: Wallet, action: any, isMainnet: boolean): Promise<Signature> {
+export async function signUsdTransferAction(action: any, isMainnet: boolean): Promise<Signature> {
     return signUserSignedAction(
-        wallet,
         action,
         [
             { name: 'hyperliquidChain', type: 'string' },
@@ -114,9 +112,8 @@ export async function signUsdTransferAction(wallet: Wallet, action: any, isMainn
     );
 }
 
-export async function signWithdrawFromBridgeAction(wallet: Wallet, action: any, isMainnet: boolean): Promise<Signature> {
+export async function signWithdrawFromBridgeAction(action: any, isMainnet: boolean): Promise<Signature> {
     return signUserSignedAction(
-        wallet,
         action,
         [
             { name: 'hyperliquidChain', type: 'string' },
@@ -129,9 +126,8 @@ export async function signWithdrawFromBridgeAction(wallet: Wallet, action: any, 
     );
 }
 
-export async function signAgent(wallet: Wallet, action: any, isMainnet: boolean): Promise<Signature> {
+export async function signAgent(action: any, isMainnet: boolean): Promise<Signature> {
     return signUserSignedAction(
-        wallet,
         action,
         [
             { name: 'hyperliquidChain', type: 'string' },
@@ -144,15 +140,16 @@ export async function signAgent(wallet: Wallet, action: any, isMainnet: boolean)
     );
 }
 
-async function signInner(wallet: Wallet | HDNodeWallet, data: any): Promise<Signature> {
-    const signature = await wallet.signTypedData(data.domain, data.types, data.message);
-    return splitSig(signature);
+async function signInner(data: any): Promise<Signature> {
+    // const signature = await wallet.signTypedData(data.domain, data.types, data.message);
+    // return splitSig(signature);
+    return { r: '0x', s: '0x', v: 0 };
 }
 
-function splitSig(sig: string): Signature {
-    const { r, s, v } = ethers.Signature.from(sig);
-    return { r, s, v };
-}
+// function splitSig(sig: string): Signature {
+//     const { r, s, v } = ViemSignature.from(sig);
+//     return { r, s, v };
+// }
 
 export function floatToWire(x: number): string {
     const rounded = x.toFixed(8);

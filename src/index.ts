@@ -5,7 +5,6 @@ import { WebSocketSubscriptions } from './websocket/subscriptions';
 import { RateLimiter } from './utils/rateLimiter';
 import * as CONSTANTS from './types/constants';
 import { CustomOperations } from './rest/custom';
-import { ethers } from 'ethers';
 import { SymbolConversion } from './utils/symbolConversion';
 import { AuthenticationError } from './utils/errors';
 
@@ -27,7 +26,7 @@ export class Hyperliquid {
   private _privateKey?: string;
   private _walletAddress?: string;
 
-  constructor(privateKey?: string, testnet: boolean = false, walletAddress?: string) {
+  constructor(testnet: boolean = false, walletAddress?: string) {
     const baseURL = testnet ? CONSTANTS.BASE_URLS.TESTNET : CONSTANTS.BASE_URLS.PRODUCTION;
 
     this.rateLimiter = new RateLimiter();
@@ -44,12 +43,6 @@ export class Hyperliquid {
     // Create proxy objects for exchange and custom
     this.exchange = this.createAuthenticatedProxy(ExchangeAPI);
     this.custom = this.createAuthenticatedProxy(CustomOperations);
-
-    if (privateKey) {
-      this._privateKey = privateKey;
-      this._walletAddress = walletAddress;
-      this.initializePrivateKey(privateKey, testnet);
-    }
   }
 
   public async connect(): Promise<void> {
@@ -83,68 +76,17 @@ export class Hyperliquid {
     await this.connect();
   }
 
-  private initializePrivateKey(privateKey: string, testnet: boolean): void {
-    try {
-      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}`;
-      new ethers.Wallet(formattedPrivateKey); // Validate the private key
-      
-      this.exchange = new ExchangeAPI(
-        testnet, 
-        formattedPrivateKey, 
-        this.info, 
-        this.rateLimiter, 
-        this.symbolConversion, 
-        this.walletAddress,
-        this
-      );
-      
-      this.custom = new CustomOperations(
-        this.exchange, 
-        this.info, 
-        formattedPrivateKey, 
-        this.symbolConversion, 
-        this.walletAddress
-      );
-      
-      this.isValidPrivateKey = true;
-    } catch (error) {
-      console.warn("Invalid private key provided. Some functionalities will be limited.");
-      this.isValidPrivateKey = false;
-    }
-  }
-
   private createAuthenticatedProxy<T extends object>(Class: new (...args: any[]) => T): T {
     return new Proxy({} as T, {
       get: (target, prop) => {
-        if (!this.isValidPrivateKey) {
-          throw new AuthenticationError('Invalid or missing private key. This method requires authentication.');
-        }
+        // if (!this.isValidPrivateKey) {
+        //   throw new AuthenticationError('Invalid or missing private key. This method requires authentication.');
+        // }
         return target[prop as keyof T];
       }
     });
   }
 
-  private initializeWithPrivateKey(privateKey: string, testnet: boolean = false): void {
-    try {
-      const formattedPrivateKey = privateKey.startsWith('0x') ? privateKey : `0x${privateKey}` as `0x${string}`;
-      new ethers.Wallet(formattedPrivateKey); // Validate the private key
-      
-      this.exchange = new ExchangeAPI(
-          testnet, 
-          formattedPrivateKey, 
-          this.info, 
-          this.rateLimiter, 
-          this.symbolConversion, 
-          this.walletAddress,
-          this
-      );
-      this.custom = new CustomOperations(this.exchange, this.info, formattedPrivateKey, this.symbolConversion, this.walletAddress);
-      this.isValidPrivateKey = true;
-    } catch (error) {
-      console.warn("Invalid private key provided. Some functionalities will be limited.");
-      this.isValidPrivateKey = false;
-    }
-  }
 
   // Modify existing methods to check initialization
   public isAuthenticated(): boolean {
@@ -152,6 +94,10 @@ export class Hyperliquid {
     return this.isValidPrivateKey;
 }
 
+
+  // public isAuthenticated(): boolean {
+  //   return this.isValidPrivateKey;
+  // }
 
 disconnect(): void {
     this.ensureInitialized();
